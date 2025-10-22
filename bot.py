@@ -4,12 +4,13 @@ import os
 from dotenv import load_dotenv
 from database import Database
 import logging
+from flask import Flask
+from threading import Thread
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 GUILD_ID = int(os.getenv('GUILD_ID'))
 ADMIN_ROLE_ID = int(os.getenv('ADMIN_ROLE_ID'))
-SECRET_CODE = os.getenv('SECRET_CODE')
 
 # Create logs directory
 os.makedirs('logs', exist_ok=True)
@@ -23,6 +24,21 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
+
+# FLASK WEB SERVER (KEEPS BOT ALIVE ON RENDER)
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "🎃 Halloween Bot is alive!"
+
+def run_flask():
+    app.run(host='0.0.0.0', port=8080)
+
+def keep_alive():
+    t = Thread(target=run_flask)
+    t.daemon = True
+    t.start()
 
 # Bot setup with better timeout handling
 intents = discord.Intents.default()
@@ -51,7 +67,7 @@ async def on_ready():
         await bot.load_extension('cogs.points')
         await bot.load_extension('cogs.game')
         await bot.load_extension('cogs.freeplay')
-        await bot.load_extension('cogs.messagecounter')  # NEW COG
+        await bot.load_extension('cogs.messagecounter')
         print('All cogs loaded successfully')
     except Exception as e:
         print(f'Cog loading error: {e}')
@@ -86,4 +102,5 @@ async def on_app_command_error(interaction: discord.Interaction, error: discord.
             logging.error(f"Command error: {error}", exc_info=True)
 
 if __name__ == '__main__':
+    keep_alive()  # Start Flask server
     bot.run(TOKEN)
