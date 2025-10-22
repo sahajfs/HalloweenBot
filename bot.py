@@ -53,14 +53,12 @@ bot = commands.Bot(
 
 bot.db = Database()
 bot.admin_role_id = ADMIN_ROLE_ID
-bot.secret_code = SECRET_CODE
 
 @bot.event
 async def on_ready():
     await bot.db.setup()
     print(f'Bot {bot.user} is online!')
     print(f'Admin Role ID: {ADMIN_ROLE_ID}')
-    print(f'Secret Code Active: {SECRET_CODE}')
 
     # Load cogs
     try:
