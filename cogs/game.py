@@ -7,8 +7,9 @@ import os
 
 GUILD_ID = int(os.getenv('GUILD_ID'))
 
+# DISPLAY REWARDS (What players SEE) - Changed "8 Tomato" to "4 Tomato"
 DISPLAY_REWARDS = {
-    "8 Tomato": "35%",
+    "4 Tomato": "35%",  # ← CHANGED FROM "8 Tomato"
     "2x Mango": "25%",
     "2x 50-100k DPS": "15%",
     "3x Lucky Block": "12.5%",
@@ -17,8 +18,9 @@ DISPLAY_REWARDS = {
     "Secret Dragon Canneiloni (sab)": "0.5%"
 }
 
+# ACTUAL REWARDS for regular Trick or Treat (keeping original rigging)
 ACTUAL_REWARDS = [
-    ("8 Tomato", 55.5),
+    ("4 Tomato", 55.5),  # ← CHANGED FROM "8 Tomato"
     ("2x Mango", 20.0),
     ("2x 50-100k DPS", 12.5),
     ("3x Lucky Block", 7.5),
