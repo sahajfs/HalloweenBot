@@ -9,11 +9,10 @@ GUILD_ID = int(os.getenv('GUILD_ID'))
 # YOUR CHANNELS - Messages counted ONLY in these 2 channels
 COUNTED_CHANNELS = [
     1391149229594116427,  # Channel 1
-    1407443051768447006,  # Channel 2
 ]
 
-# Messages needed for 1 point - CHANGED FROM 300 TO 500
-MESSAGES_PER_POINT = 500
+# Messages needed for 1 point
+MESSAGES_PER_POINT = 300
 
 class MessageCounter(commands.Cog):
     def __init__(self, bot):
@@ -36,7 +35,7 @@ class MessageCounter(commands.Cog):
         # Increment message count
         new_count = await self.bot.db.increment_message_count(message.author.id)
         
-        # Check if user reached 500 messages (changed from 300)
+        # Check if user reached 300 messages
         if new_count >= MESSAGES_PER_POINT:
             # Award 1 point
             await self.bot.db.add_points(message.author.id, 1)
