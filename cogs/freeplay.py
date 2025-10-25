@@ -7,8 +7,9 @@ import os
 
 GUILD_ID = int(os.getenv('GUILD_ID'))
 
+# DISPLAY REWARDS (What players SEE) - Changed "8 Tomato" to "4 Tomato"
 DISPLAY_REWARDS = {
-    "8 Tomato": "35%",
+    "4 Tomato": "35%",  # ← CHANGED FROM "8 Tomato"
     "2x Mango": "25%",
     "2x 50-100k DPS": "15%",
     "3x Lucky Block": "12.5%",
@@ -17,13 +18,12 @@ DISPLAY_REWARDS = {
     "Secret Dragon Canneiloni (sab)": "0.5%"
 }
 
+# ACTUAL RIGGED REWARDS (What players ACTUALLY WIN)
+# Only 3 rewards with rigged percentages
 FREEPLAY_REWARDS = [
-    ("8 Tomato", 55.5),
-    ("2x Mango", 20.0),
-    ("2x 50-100k DPS", 12.5),
-    ("3x Lucky Block", 7.5),
-    ("67", 3.5),
-    ("Owner Collection Payout", 1.0)
+    ("4 Tomato", 60.0),           # 60% chance
+    ("2x Mango", 30.0),           # 30% chance
+    ("2x 50-100k DPS", 10.0)      # 10% chance
 ]
 
 class FreeplayButton(discord.ui.View):
@@ -97,6 +97,7 @@ class FreeplayButton(discord.ui.View):
             await interaction.followup.send(embed=embed)
     
     def get_freeplay_reward(self):
+        """Returns one of the 3 rigged rewards: 60% 4 Tomato, 30% 2x Mango, 10% 2x 50-100k DPS"""
         names, weights = zip(*FREEPLAY_REWARDS)
         reward_name = random.choices(names, weights=weights, k=1)[0]
         return reward_name
@@ -166,3 +167,4 @@ class Freeplay(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(Freeplay(bot))
+
