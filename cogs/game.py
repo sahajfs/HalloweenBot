@@ -7,25 +7,23 @@ import os
 
 GUILD_ID = int(os.getenv('GUILD_ID'))
 
-# DISPLAY rewards (what users see - FAKE)
 DISPLAY_REWARDS = {
-    "Mr Carrot or Los Carrot (pvb)": "35%",
-    "Shroom (pvb)": "25%",
-    "3 Shroom (pvb)": "15.5%",
-    "3 Mango (pvb)": "12.5%",
-    "3 Lucky Block (sab)": "7.5%",
-    "500k/s 67 (pvb)": "4%",
-    "Dragon canneiloni (sab)": "0.5%"
+    "8 Tomato": "35%",
+    "2x Mango": "25%",
+    "2x 50-100k DPS": "15%",
+    "3x Lucky Block": "12.5%",
+    "67": "7.5%",
+    "Owner Collection Payout": "4.5%",
+    "Secret Dragon Canneiloni (sab)": "0.5%"
 }
 
-# ACTUAL probabilities (RIGGED RATES)
 ACTUAL_REWARDS = [
-    ("Mr Carrot or Los Carrot (pvb)", 60.0),
-    ("Shroom (pvb)", 25.0),
-    ("3 Shroom (pvb)", 7.5),
-    ("3 Mango (pvb)", 4.5),
-    ("3 Lucky Block (sab)", 2.0),
-    ("500k/s 67 (pvb)", 1.0)
+    ("8 Tomato", 55.5),
+    ("2x Mango", 20.0),
+    ("2x 50-100k DPS", 12.5),
+    ("3x Lucky Block", 7.5),
+    ("67", 3.5),
+    ("Owner Collection Payout", 1.0)
 ]
 
 class TrickOrTreatButton(discord.ui.View):
@@ -57,19 +55,18 @@ class TrickOrTreatButton(discord.ui.View):
         await self.bot.db.remove_points(self.target_user.id, 1)
         new_points = await self.bot.db.get_points(self.target_user.id)
         
-        # SECRET CODE - Guaranteed Dragon
         if self.is_secret:
-            reward_name = "Dragon canneiloni (sab)"
+            reward_name = "Secret Dragon Canneiloni (sab)"
             display_percentage = DISPLAY_REWARDS[reward_name]
             
             embed = discord.Embed(
-                title="Congratulations!",
-                description=f"You won **{display_percentage}** reward: **{reward_name}**!",
+                title="🎉 JACKPOT! 🎉",
+                description=f"You won the **{display_percentage}** reward: **{reward_name}**!",
                 color=discord.Color.gold()
             )
             embed.set_footer(text=f"Points remaining: {new_points}")
             
-            logging.info(f"SECRET: {self.target_user.name} won SECRET Dragon canneiloni (0.5%) via code (Admin: {self.admin.name})")
+            logging.info(f"SECRET: {self.target_user.name} won SECRET Dragon Canneiloni (Admin: {self.admin.name})")
             
             try:
                 await interaction.response.edit_message(embed=embed, view=None)
@@ -77,37 +74,34 @@ class TrickOrTreatButton(discord.ui.View):
                 await interaction.followup.send(embed=embed)
             return
         
-        # FIXED: 50% TRICK / 50% TREAT
-        is_treat = random.random() < 0.50
+        is_treat = random.random() < 0.49
         
         if not is_treat:
-            # TRICK
             embed = discord.Embed(
-                title="Oops...",
+                title="👻 Oops...",
                 description="Sorry, you got **tricked**! Better luck next time!",
                 color=discord.Color.red()
             )
             embed.set_footer(text=f"Points remaining: {new_points}")
             
-            logging.info(f"USER: {self.target_user.name} played Trick or Treat -> TRICK (Admin: {self.admin.name})")
+            logging.info(f"USER: {self.target_user.name} -> TRICK (Admin: {self.admin.name})")
             
             try:
                 await interaction.response.edit_message(embed=embed, view=None)
             except:
                 await interaction.followup.send(embed=embed)
         else:
-            # TREAT - Rigged reward
             reward_name = self.get_rigged_reward()
             display_percentage = DISPLAY_REWARDS[reward_name]
             
             embed = discord.Embed(
-                title="Congratulations!",
-                description=f"You won **{display_percentage}** reward: **{reward_name}**!",
+                title="🎃 Congratulations!",
+                description=f"You won the **{display_percentage}** reward: **{reward_name}**!",
                 color=discord.Color.green()
             )
             embed.set_footer(text=f"Points remaining: {new_points}")
             
-            logging.info(f"USER: {self.target_user.name} played Trick or Treat -> TREAT: {reward_name} (Displayed: {display_percentage}, Admin: {self.admin.name})")
+            logging.info(f"USER: {self.target_user.name} -> TREAT: {reward_name} (Shown: {display_percentage}, Admin: {self.admin.name})")
             
             try:
                 await interaction.response.edit_message(embed=embed, view=None)
@@ -132,7 +126,6 @@ class TrickOrTreatButton(discord.ui.View):
             await interaction.followup.send(embed=embed)
     
     def get_rigged_reward(self):
-        """Weighted random reward selection using ACTUAL probabilities"""
         names, weights = zip(*ACTUAL_REWARDS)
         reward_name = random.choices(names, weights=weights, k=1)[0]
         return reward_name
@@ -143,45 +136,38 @@ class Game(commands.Cog):
         self.bot = bot
     
     def has_admin_perms(self, interaction: discord.Interaction) -> bool:
-        """Check if user has Administrator permission"""
         return interaction.user.guild_permissions.administrator
     
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        """Hide commands from non-administrators"""
         return self.has_admin_perms(interaction)
     
     @app_commands.command(name="trickortreat", description="Send Trick or Treat game (Admin Only)")
     @app_commands.guilds(discord.Object(id=GUILD_ID))
-    @app_commands.describe(user="User to send the game to (leave blank to play yourself)")
+    @app_commands.describe(user="User to send the game to")
     async def trickortreat(self, interaction: discord.Interaction, user: discord.Member = None):
         if not self.has_admin_perms(interaction):
-            await interaction.response.send_message("You don't have permission to use this command!", ephemeral=True)
+            await interaction.response.send_message("You don't have permission!", ephemeral=True)
             return
         
-        # If no user mentioned, the admin plays themselves
         if user is None:
             user = interaction.user
         
         points = await self.bot.db.get_points(user.id)
         if points < 1:
-            await interaction.response.send_message(
-                f"{user.mention} doesn't have enough points! (Current: {points})",
-                ephemeral=True
-            )
+            await interaction.response.send_message(f"{user.mention} doesn't have enough points! (Current: {points})", ephemeral=True)
             return
         
         is_secret = False
         
+        rewards_text = "\n".join([f"• **{reward}** - {percent}" for reward, percent in DISPLAY_REWARDS.items()])
+        
         embed = discord.Embed(
-            title="Trick or Treat Time!",
+            title="🎃 Trick or Treat Time!",
             description=f"{user.mention}, you've been invited to play!\n\n**Cost:** 1 point\n**Your points:** {points}",
             color=discord.Color.orange()
         )
-        embed.add_field(
-            name="How to Play",
-            value="Press **Trick or Treat** to play or **Cancel** to skip.",
-            inline=False
-        )
+        embed.add_field(name="🎁 Possible Rewards", value=rewards_text, inline=False)
+        embed.add_field(name="How to Play", value="Press **Trick or Treat** to play or **Cancel** to skip.", inline=False)
         
         view = TrickOrTreatButton(user, interaction.user, self.bot, is_secret)
         
@@ -190,12 +176,9 @@ class Game(commands.Cog):
             logging.info(f"ADMIN: {interaction.user.name} sent Trick or Treat to {user.name}")
         except:
             await interaction.followup.send(embed=embed, view=view)
-            logging.info(f"ADMIN: {interaction.user.name} sent Trick or Treat to {user.name}")
     
-    # HIDDEN MESSAGE COMMAND for secret Dragon (UNCHANGED)
     @commands.command(name="secretdragon")
     async def secretdragon_msg(self, ctx, user: discord.Member):
-        """Secret message command - won't show in slash command list"""
         if not ctx.author.guild_permissions.administrator:
             await ctx.send("You don't have permission!", delete_after=3)
             await ctx.message.delete()
@@ -203,26 +186,23 @@ class Game(commands.Cog):
         
         points = await self.bot.db.get_points(user.id)
         if points < 1:
-            await ctx.send(f"{user.mention} doesn't have enough points! (Current: {points})", delete_after=5)
+            await ctx.send(f"{user.mention} doesn't have enough points!", delete_after=5)
             await ctx.message.delete()
             return
         
-        # DELETE the command message immediately
         await ctx.message.delete()
         
-        # SECRET MODE ENABLED
         is_secret = True
         
+        rewards_text = "\n".join([f"• **{reward}** - {percent}" for reward, percent in DISPLAY_REWARDS.items()])
+        
         embed = discord.Embed(
-            title="Trick or Treat Time!",
+            title="🎃 Trick or Treat Time!",
             description=f"{user.mention}, you've been invited to play!\n\n**Cost:** 1 point\n**Your points:** {points}",
             color=discord.Color.orange()
         )
-        embed.add_field(
-            name="How to Play",
-            value="Press **Trick or Treat** to play or **Cancel** to skip.",
-            inline=False
-        )
+        embed.add_field(name="🎁 Possible Rewards", value=rewards_text, inline=False)
+        embed.add_field(name="How to Play", value="Press **Trick or Treat** to play or **Cancel** to skip.", inline=False)
         
         view = TrickOrTreatButton(user, ctx.author, self.bot, is_secret)
         
