@@ -12,8 +12,8 @@ COUNTED_CHANNELS = [
     1407443051768447006,  # Channel 2
 ]
 
-# Messages needed for 1 point
-MESSAGES_PER_POINT = 300
+# Messages needed for 1 point - CHANGED FROM 300 TO 500
+MESSAGES_PER_POINT = 500
 
 class MessageCounter(commands.Cog):
     def __init__(self, bot):
@@ -36,7 +36,7 @@ class MessageCounter(commands.Cog):
         # Increment message count
         new_count = await self.bot.db.increment_message_count(message.author.id)
         
-        # Check if user reached 300 messages
+        # Check if user reached 500 messages (changed from 300)
         if new_count >= MESSAGES_PER_POINT:
             # Award 1 point
             await self.bot.db.add_points(message.author.id, 1)
