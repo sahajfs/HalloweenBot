@@ -6,14 +6,21 @@ import os
 
 GUILD_ID = int(os.getenv('GUILD_ID'))
 
+# Load all admin role IDs from environment variables
+ADMIN_ROLE_IDS = []
+for i in range(1, 10):  # Check up to ADMIN_ROLE_ID_9
+    role_id = os.getenv(f'ADMIN_ROLE_ID_{i}' if i > 1 else 'ADMIN_ROLE_ID')
+    if role_id:
+        ADMIN_ROLE_IDS.append(int(role_id))
+
 class Points(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
     
     def has_specific_role(self, interaction: discord.Interaction) -> bool:
-        """Check if user has THE SPECIFIC role ID - NOT admin, NOT owner"""
-        specific_role_id = self.bot.admin_role_id  # 1424952240220803203
-        return any(role.id == specific_role_id for role in interaction.user.roles)
+        """Check if user has ANY of the admin role IDs"""
+        user_role_ids = [role.id for role in interaction.user.roles]
+        return any(role_id in user_role_ids for role_id in ADMIN_ROLE_IDS)
     
     async def safe_send(self, interaction: discord.Interaction, message: str = None, embed: discord.Embed = None, ephemeral: bool = False):
         """Safely send message with error handling"""
@@ -39,7 +46,7 @@ class Points(commands.Cog):
                 pass
     
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        """Hide /point command from users without the specific role"""
+        """Hide /point command from users without the specific roles"""
         return self.has_specific_role(interaction)
     
     @app_commands.command(name="point", description="Manage user points (Specific Role Only)")
@@ -56,14 +63,12 @@ class Points(commands.Cog):
         user: discord.Member = None,
         amount: int = None
     ):
-        # CRITICAL: Only the specific role ID can manage points
         if not self.has_specific_role(interaction):
             await self.safe_send(interaction, "❌ You don't have the required role to manage points!", ephemeral=True)
             return
         
         action = action.lower()
         
-        # LIST command
         if action == "list":
             if user:
                 points = await self.bot.db.get_points(user.id)
@@ -96,7 +101,6 @@ class Points(commands.Cog):
             await self.safe_send(interaction, "Please mention a user!", ephemeral=True)
             return
         
-        # INCREASE
         if action == "increase":
             if not amount or amount <= 0:
                 await self.safe_send(interaction, "Please provide a valid amount!", ephemeral=True)
@@ -112,7 +116,6 @@ class Points(commands.Cog):
                 f"Added **{amount}** points to {user.mention}! They now have **{new_points}** points."
             )
         
-        # DECREASE
         elif action == "decrease":
             if not amount or amount <= 0:
                 await self.safe_send(interaction, "Please provide a valid amount!", ephemeral=True)
@@ -128,7 +131,6 @@ class Points(commands.Cog):
                 f"Removed **{amount}** points from {user.mention}! They now have **{new_points}** points."
             )
         
-        # RESET
         elif action == "reset":
             await self.bot.db.reset_points(user.id)
             
