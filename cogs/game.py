@@ -7,22 +7,22 @@ import os
 
 GUILD_ID = int(os.getenv('GUILD_ID'))
 
-# DISPLAY REWARDS (What players SEE) - Changed "8 Tomato" to "4 Tomato"
+# DISPLAY REWARDS (What players SEE)
 DISPLAY_REWARDS = {
-    "4 Tomato": "35%",  # ← CHANGED FROM "8 Tomato"
+    "6 Tomatrio": "35%",
     "2x Mango": "25%",
-    "2x 50-100k DPS": "15%",
+    "2x 50-100k Damage (per 2 second)": "15%",
     "3x Lucky Block": "12.5%",
     "67": "7.5%",
     "Owner Collection Payout": "4.5%",
     "Secret Dragon Canneiloni (sab)": "0.5%"
 }
 
-# ACTUAL REWARDS for regular Trick or Treat (keeping original rigging)
+# ACTUAL REWARDS (RIGGED - What they really get)
 ACTUAL_REWARDS = [
-    ("4 Tomato", 55.5),  # ← CHANGED FROM "8 Tomato"
+    ("6 Tomatrio", 55.5),
     ("2x Mango", 20.0),
-    ("2x 50-100k DPS", 12.5),
+    ("2x 50-100k Damage (per 2 second)", 12.5),
     ("3x Lucky Block", 7.5),
     ("67", 3.5),
     ("Owner Collection Payout", 1.0)
@@ -81,7 +81,7 @@ class TrickOrTreatButton(discord.ui.View):
         if not is_treat:
             embed = discord.Embed(
                 title="👻 Oops...",
-                description="Sorry, you got **tricked**! Better luck next time!",
+                description="Sorry, you got **tricked**! So sorry for trick goodluck for next time!",
                 color=discord.Color.red()
             )
             embed.set_footer(text=f"Points remaining: {new_points}")
@@ -213,3 +213,4 @@ class Game(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(Game(bot))
+
