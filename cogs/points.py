@@ -1,152 +1,167 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
+import random
 import logging
 import os
 
 GUILD_ID = int(os.getenv('GUILD_ID'))
 
-# Load all admin role IDs from environment variables
-ADMIN_ROLE_IDS = []
-for i in range(1, 10):  # Check up to ADMIN_ROLE_ID_9
-    role_id = os.getenv(f'ADMIN_ROLE_ID_{i}' if i > 1 else 'ADMIN_ROLE_ID')
-    if role_id:
-        ADMIN_ROLE_IDS.append(int(role_id))
+# DISPLAY REWARDS (What players SEE)
+DISPLAY_REWARDS = {
+    "6 Tomatrio": "35%",
+    "2x Mango": "25%",
+    "2x 50-100k Damage (per 2 second)": "15%",
+    "3x Lucky Block": "12.5%",
+    "67": "7.5%",
+    "Owner Collection Payout": "4.5%",
+    "Secret Dragon Canneiloni (sab)": "0.5%"
+}
 
-class Points(commands.Cog):
+# ACTUAL FREEPLAY REWARDS (only 3 rewards)
+FREEPLAY_REWARDS = [
+    ("6 Tomatrio", 60.0),
+    ("2x Mango", 30.0),
+    ("2x 50-100k Damage (per 2 second)", 10.0)
+]
+
+class FreeplayButton(discord.ui.View):
+    def __init__(self, target_user: discord.Member, admin: discord.Member, bot):
+        super().__init__(timeout=180)
+        self.target_user = target_user
+        self.admin = admin
+        self.bot = bot
+        self.played = False
+    
+    @discord.ui.button(label="Play Freeplay", style=discord.ButtonStyle.success)
+    async def play_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.target_user.id:
+            await interaction.response.send_message("This isn't for you!", ephemeral=True)
+            return
+        
+        if self.played:
+            await interaction.response.send_message("You already played!", ephemeral=True)
+            return
+        
+        has_claimed = await self.bot.db.has_claimed_freeplay(self.target_user.id)
+        if has_claimed:
+            embed = discord.Embed(
+                title="Already Claimed!",
+                description="You have already claimed your freeplay! You can only claim it once.",
+                color=discord.Color.red()
+            )
+            try:
+                await interaction.response.edit_message(embed=embed, view=None)
+            except:
+                await interaction.followup.send(embed=embed)
+            
+            logging.info(f"FREEPLAY BLOCKED: {self.target_user.name} already claimed (Admin: {self.admin.name})")
+            return
+        
+        self.played = True
+        await self.bot.db.mark_freeplay_claimed(self.target_user.id)
+        
+        reward_name = self.get_freeplay_reward()
+        display_percentage = DISPLAY_REWARDS[reward_name]
+        
+        embed = discord.Embed(
+            title="🎁 Freeplay Gift!",
+            description=f"Congratulations! You won the **{display_percentage}** reward: **{reward_name}**!",
+            color=discord.Color.gold()
+        )
+        embed.set_footer(text="No points were used for this game!")
+        
+        logging.info(f"FREEPLAY: {self.target_user.name} -> {reward_name} (Shown: {display_percentage}, Admin: {self.admin.name})")
+        
+        try:
+            await interaction.response.edit_message(embed=embed, view=None)
+        except:
+            await interaction.followup.send(embed=embed)
+    
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.target_user.id:
+            await interaction.response.send_message("This isn't for you!", ephemeral=True)
+            return
+        
+        embed = discord.Embed(
+            title="Cancelled",
+            description="Freeplay cancelled.",
+            color=discord.Color.greyple()
+        )
+        
+        try:
+            await interaction.response.edit_message(embed=embed, view=None)
+        except:
+            await interaction.followup.send(embed=embed)
+    
+    def get_freeplay_reward(self):
+        names, weights = zip(*FREEPLAY_REWARDS)
+        reward_name = random.choices(names, weights=weights, k=1)[0]
+        return reward_name
+
+
+class Freeplay(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
     
-    def has_specific_role(self, interaction: discord.Interaction) -> bool:
-        """Check if user has ANY of the admin role IDs"""
-        user_role_ids = [role.id for role in interaction.user.roles]
-        return any(role_id in user_role_ids for role_id in ADMIN_ROLE_IDS)
-    
-    async def safe_send(self, interaction: discord.Interaction, message: str = None, embed: discord.Embed = None, ephemeral: bool = False):
-        """Safely send message with error handling"""
-        try:
-            if not interaction.response.is_done():
-                if embed:
-                    await interaction.response.send_message(embed=embed, ephemeral=ephemeral)
-                else:
-                    await interaction.response.send_message(message, ephemeral=ephemeral)
-            else:
-                if embed:
-                    await interaction.followup.send(embed=embed, ephemeral=ephemeral)
-                else:
-                    await interaction.followup.send(message, ephemeral=ephemeral)
-        except (discord.errors.HTTPException, ConnectionError) as e:
-            logging.error(f"Failed to send message: {e}")
-            try:
-                if embed:
-                    await interaction.followup.send(embed=embed, ephemeral=ephemeral)
-                else:
-                    await interaction.followup.send(message, ephemeral=ephemeral)
-            except:
-                pass
+    def has_admin_perms(self, interaction: discord.Interaction) -> bool:
+        return interaction.user.guild_permissions.administrator
     
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        """Hide /point command from users without the specific roles"""
-        return self.has_specific_role(interaction)
+        return self.has_admin_perms(interaction)
     
-    @app_commands.command(name="point", description="Manage user points (Specific Role Only)")
+    @app_commands.command(name="freeplay", description="Send a free Trick or Treat (one-time only)")
     @app_commands.guilds(discord.Object(id=GUILD_ID))
-    @app_commands.describe(
-        action="Choose action: increase, decrease, reset, list",
-        user="Target user (optional for 'list')",
-        amount="Amount of points (for increase/decrease)"
-    )
-    async def point(
-        self, 
-        interaction: discord.Interaction, 
-        action: str,
-        user: discord.Member = None,
-        amount: int = None
-    ):
-        if not self.has_specific_role(interaction):
-            await self.safe_send(interaction, "❌ You don't have the required role to manage points!", ephemeral=True)
+    @app_commands.describe(user="User to send freeplay to")
+    async def freeplay(self, interaction: discord.Interaction, user: discord.Member):
+        if not self.has_admin_perms(interaction):
+            await interaction.response.send_message("You don't have permission!", ephemeral=True)
             return
         
-        action = action.lower()
-        
-        if action == "list":
-            if user:
-                points = await self.bot.db.get_points(user.id)
-                embed = discord.Embed(
-                    title=f"Points for {user.display_name}",
-                    description=f"**{points}** points",
-                    color=discord.Color.orange()
-                )
-                await self.safe_send(interaction, embed=embed)
-            else:
-                all_points = await self.bot.db.get_all_points()
-                if not all_points:
-                    await self.safe_send(interaction, "No users have points yet.")
-                    return
-                
-                embed = discord.Embed(
-                    title="All User Points",
-                    color=discord.Color.orange()
-                )
-                
-                for user_id, points in all_points[:10]:
-                    member = interaction.guild.get_member(user_id)
-                    name = member.display_name if member else f"User {user_id}"
-                    embed.add_field(name=name, value=f"{points} points", inline=False)
-                
-                await self.safe_send(interaction, embed=embed)
-            return
-        
-        if not user:
-            await self.safe_send(interaction, "Please mention a user!", ephemeral=True)
-            return
-        
-        if action == "increase":
-            if not amount or amount <= 0:
-                await self.safe_send(interaction, "Please provide a valid amount!", ephemeral=True)
-                return
-            
-            await self.bot.db.add_points(user.id, amount)
-            new_points = await self.bot.db.get_points(user.id)
-            
-            logging.info(f"ADMIN: {interaction.user.name} gave +{amount} points to {user.name} (Total: {new_points})")
-            
-            await self.safe_send(
-                interaction,
-                f"Added **{amount}** points to {user.mention}! They now have **{new_points}** points."
-            )
-        
-        elif action == "decrease":
-            if not amount or amount <= 0:
-                await self.safe_send(interaction, "Please provide a valid amount!", ephemeral=True)
-                return
-            
-            await self.bot.db.remove_points(user.id, amount)
-            new_points = await self.bot.db.get_points(user.id)
-            
-            logging.info(f"ADMIN: {interaction.user.name} removed -{amount} points from {user.name} (Total: {new_points})")
-            
-            await self.safe_send(
-                interaction,
-                f"Removed **{amount}** points from {user.mention}! They now have **{new_points}** points."
-            )
-        
-        elif action == "reset":
-            await self.bot.db.reset_points(user.id)
-            
-            logging.info(f"ADMIN: {interaction.user.name} reset points for {user.name}")
-            
-            await self.safe_send(
-                interaction,
-                f"Reset points for {user.mention}! They now have **0** points."
-            )
-        
-        else:
-            await self.safe_send(
-                interaction,
-                "Invalid action! Use: increase, decrease, reset, or list",
+        has_claimed = await self.bot.db.has_claimed_freeplay(user.id)
+        if has_claimed:
+            await interaction.response.send_message(
+                f"❌ {user.mention} has already claimed their freeplay!\n\nUse `/resetfreeplay @{user.name}` to reset.",
                 ephemeral=True
             )
+            return
+        
+        rewards_text = "\n".join([f"• **{reward}** - {percent}" for reward, percent in DISPLAY_REWARDS.items()])
+        
+        embed = discord.Embed(
+            title="🎁 Free Gift Time!",
+            description=f"{user.mention}, you've received a **FREE** Trick or Treat!\n\n⚠️ **This is a ONE-TIME offer!**",
+            color=discord.Color.gold()
+        )
+        embed.add_field(name="🎁 Possible Rewards", value=rewards_text, inline=False)
+        embed.add_field(name="How to Play", value="Press **Play Freeplay** or **Cancel**.\n\n**Note:** You can only claim this once!", inline=False)
+        embed.set_footer(text="No points required!")
+        
+        view = FreeplayButton(user, interaction.user, self.bot)
+        
+        try:
+            await interaction.response.send_message(embed=embed, view=view)
+            logging.info(f"ADMIN: {interaction.user.name} sent Freeplay to {user.name}")
+        except:
+            await interaction.followup.send(embed=embed, view=view)
+    
+    @app_commands.command(name="resetfreeplay", description="Reset freeplay claim")
+    @app_commands.guilds(discord.Object(id=GUILD_ID))
+    @app_commands.describe(user="User to reset (blank = reset ALL)")
+    async def resetfreeplay(self, interaction: discord.Interaction, user: discord.Member = None):
+        if not self.has_admin_perms(interaction):
+            await interaction.response.send_message("You don't have permission!", ephemeral=True)
+            return
+        
+        if user is None:
+            await self.bot.db.reset_all_freeplays()
+            await interaction.response.send_message("✅ Reset ALL freeplay claims!", ephemeral=True)
+            logging.info(f"ADMIN: {interaction.user.name} reset ALL freeplays")
+        else:
+            await self.bot.db.reset_freeplay(user.id)
+            await interaction.response.send_message(f"✅ Reset freeplay for {user.mention}!", ephemeral=True)
+            logging.info(f"ADMIN: {interaction.user.name} reset freeplay for {user.name}")
 
 async def setup(bot):
-    await bot.add_cog(Points(bot))
+    await bot.add_cog(Freeplay(bot))
