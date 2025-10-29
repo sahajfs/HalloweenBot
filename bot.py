@@ -8,11 +8,17 @@ import logging
 load_dotenv()
 
 TOKEN = os.getenv('DISCORD_TOKEN')
-GUILD_ID = int(os.getenv('GUILD_ID'))
-ADMIN_ROLE_ID = int(os.getenv('ADMIN_ROLE_ID'))
+GUILD_ID = os.getenv('GUILD_ID')
+
+# Validate required environment variables
+if not TOKEN:
+    raise ValueError("DISCORD_TOKEN environment variable is not set")
+if not GUILD_ID:
+    raise ValueError("GUILD_ID environment variable is not set")
+
+GUILD_ID = int(GUILD_ID)
 
 os.makedirs('logs', exist_ok=True)
-
 logging.basicConfig(
     level=logging.INFO,
     format='[%(asctime)s] %(message)s',
@@ -33,13 +39,11 @@ bot = commands.Bot(
 )
 
 bot.db = Database()
-bot.admin_role_id = ADMIN_ROLE_ID
 
 @bot.event
 async def on_ready():
     await bot.db.setup()
     print(f'🎃 Bot {bot.user} is online!')
-    print(f'👑 Admin Role ID: {ADMIN_ROLE_ID}')
     print(f'🎯 Guild ID: {GUILD_ID}')
     
     try:
